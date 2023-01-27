@@ -24,7 +24,13 @@ title ExeLuncher(SocketIO client)
 ::"C:\Program Files\Epic Games\UE_5.1\Engine\Binaries\Win64\\UnrealEditor-Cmd.exe" -project "C:\0.ps\psTest_5_1\psTest_5_1.uproject" -log -EditorPixelStreamingRes=1920x1080 -EditorPixelStreamingStartOnLaunch=false 
 
 
-"C:\Program Files\Epic Games\UE_5.1\Engine\Binaries\Win64\\UnrealEditor-Cmd.exe" -project "C:\0.ps\psTest_5_1\psTest_5_1.uproject" -log -EditorPixelStreamingRes=1920x1080 -EditorPixelStreamingUseRemoteSignallingServer=true -EditorPixelStreamingStartOnLaunch=false 
+::"C:\Program Files\Epic Games\UE_5.1\Engine\Binaries\Win64\\UnrealEditor-Cmd.exe" -project "C:\0.ps\psTest_5_1\psTest_5_1.uproject" -log -EditorPixelStreamingRes=1920x1080 -EditorPixelStreamingUseRemoteSignallingServer=true -EditorPixelStreamingStartOnLaunch=false  -PixelStreamingURL=ws://99.60.91.141:8888
+::"C:\Program Files\Epic Games\UE_5.1\Engine\Binaries\Win64\\UnrealEditor-Cmd.exe" -project "C:\0.ps\VISTNext\VISTNext.uproject" -log -EditorPixelStreamingRes=1920x1080 -EditorPixelStreamingUseRemoteSignallingServer=true -EditorPixelStreamingStartOnLaunch=false  -PixelStreamingURL=ws://99.60.91.141:8888
+
+
+"C:\Program Files\Epic Games\UE_5.1\Engine\Binaries\Win64\\UnrealEditor-Cmd.exe" -project  "C:\0.ps\psTest_5_1\psTest_5_1.uproject" -log  -RenderOffscreen -EditorPixelStreamingRes=1920x1080 -EditorPixelStreamingStartOnLaunch=true -PixelStreamingURL=ws://192.168.0.10:8888
+
+
 
 popd 
 pause
