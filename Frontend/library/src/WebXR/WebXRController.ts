@@ -42,13 +42,18 @@ export class WebXRController {
     }
 
     public xrClicked() {
-        if (!this.xrSession) {
-            navigator.xr
-                .requestSession('immersive-vr')
+        if (!this.xrSession) 
+		{
+			this.onXrSessionStarted(this.xrSession);
+			
+            /* navigator.xr
+                .requestSession('immersive-vr')//2764r672friv2uirv2ur
                 .then((session: XRSession) => {
                     this.onXrSessionStarted(session);
-                });
-        } else {
+                }); */
+        } 
+		else 
+		{
             this.xrSession.end();
         }
     }
@@ -59,23 +64,24 @@ export class WebXRController {
         this.onSessionEnded.dispatchEvent(new Event('xrSessionEnded'));
     }
 
-    onXrSessionStarted(session: XRSession) {
+    onXrSessionStarted(session: XRSession) 
+	{
         Logger.Log(Logger.GetStackTrace(), 'XR Session started');
 
         this.xrSession = session;
-        this.xrSession.addEventListener('end', () => {
+       /*  this.xrSession.addEventListener('end', () => {
             this.onXrSessionEnded();
-        });
+        }); */
 
         const canvas = document.createElement('canvas');
         this.gl = canvas.getContext('webgl2', {
             xrCompatible: true
         });
-
+/* 
         this.xrSession.updateRenderState({
             baseLayer: new XRWebGLLayer(this.xrSession, this.gl)
         });
-
+ */
         // setup vertex shader
         const vertexShader = this.gl.createShader(this.gl.VERTEX_SHADER);
         this.gl.shaderSource(vertexShader, WebGLUtils.vertexShader());
@@ -141,17 +147,18 @@ export class WebXRController {
             'u_resolution'
         );
         this.offsetLocation = this.gl.getUniformLocation(
-            shaderProgram,
+            shaderProgram, 
             'u_offset'
         );
 
-        session.requestReferenceSpace('local').then((refSpace) => {
+       /*  session.requestReferenceSpace('local').then((refSpace) => 
+		{
             this.xrRefSpace = refSpace;
             this.xrSession.requestAnimationFrame(
                 (time: DOMHighResTimeStamp, frame: XRFrame) =>
                     this.onXrFrame(time, frame)
             );
-        });
+        }); */
 
         this.onSessionStarted.dispatchEvent(new Event('xrSessionStarted'));
     }
