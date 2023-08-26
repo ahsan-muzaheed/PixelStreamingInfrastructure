@@ -6,7 +6,7 @@
   pushd %~dp0\..\..\..\
 
   @Rem By default don't build the frontend files
-  set "shouldbuild=false"
+  set "shouldbuild=true"
 
   @Rem Check if --build is passed as argument and we will always build frontend files.
   :parse
