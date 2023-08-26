@@ -61,6 +61,8 @@
   call ..\..\SignallingWebServer\platform_scripts\cmd\node\npm run build-dev
   popd
   echo End of build PS frontend lib step.
+  
+::C:\0.ps\PixelStreamingInfrastructure_ahsan\Frontend\library\src\WebXR\WebXRController.ts
 
   @Rem Do npm install in the Frontend\implementations\EpicGames directory (note we use start because that loads PATH)
   echo ----------------------------
