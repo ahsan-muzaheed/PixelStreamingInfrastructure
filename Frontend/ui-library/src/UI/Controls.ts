@@ -70,13 +70,19 @@ export class Controls {
             if (!!this.statsIcon) {
                 this._rootElement.appendChild(this.statsIcon.rootElement);
             }
-            if (!!this.xrIcon) {
-                WebXRController.isSessionSupported('immersive-vr').then(
-                (supported: boolean) => {
-                    if (supported) {
-                        this._rootElement.appendChild(this.xrIcon.rootElement);
-                    }
-                });
+            if (!!this.xrIcon) 
+			{
+                /* WebXRController.isSessionSupported('immersive-vr').then
+				(
+					(supported: boolean) => 
+											{
+											if (supported) {
+												this._rootElement.appendChild(this.xrIcon.rootElement);
+											}
+											}
+				); */
+				
+				this._rootElement.appendChild(this.xrIcon.rootElement);
             };
         }
         return this._rootElement;
