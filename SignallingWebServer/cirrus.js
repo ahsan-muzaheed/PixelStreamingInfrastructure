@@ -4,17 +4,19 @@
 
 var express = require('express');
 var app = express();
-
+var Path = require('path');
+								
 const fs = require('fs');
 const path = require('path');
 const querystring = require('querystring');
 const bodyParser = require('body-parser');
 const logging = require('./modules/logging.js');
+const cors = require('cors');
 logging.RegisterConsoleLogger();
 
 // Command line argument --configFile needs to be checked before loading the config, all other command line arguments are dealt with through the config object
 
-const defaultConfig = {
+var defaultConfig = {
 	UseFrontend: false,
 	UseMatchmaker: false,
 	UseHTTPS: false,
@@ -34,6 +36,33 @@ const defaultConfig = {
 	MaxPlayerCount: -1
 };
 
+  defaultConfig = 
+  {
+
+	"UseFrontend": false,
+	"UseMatchmaker": true,
+	"UseHTTPS": true,
+	"UseAuthentication": false,
+	"LogToFile": true,
+	"HomepageFile": "player.html",
+	"AdditionalRoutes": {},
+	"EnableWebserver": true,
+	"MatchmakerAddress": "mps3.eaglepixelstreaming.com",
+	"MatchmakerPort": "80",
+	"MatchmakerHttpsPort": "443",
+	"PublicIp": "xxx.60.91.140",
+	"HttpPort": 80,
+	"HttpsPort": 443,
+	"StreamerPort": 8888,
+	"owner": "",
+	"SFUPort": 8889,
+	"app": "",
+	"domain": "aldar-staging.eaglepixelstreaming.com",
+	"APIendpoint": "https://files-api.eaglepixelstreaming.com/",
+	"exeDirectory": "C:/0.apps_azure/"
+}
+
+
 const argv = require('yargs').argv;
 var configFile = (typeof argv.configFile != 'undefined') ? argv.configFile.toString() : path.join(__dirname, 'config.json');
 console.log(`configFile ${configFile}`);
@@ -42,6 +71,9 @@ const config = require('./modules/config.js').init(configFile, defaultConfig);
 if (config.LogToFile) {
 	logging.RegisterFileLogger('./logs');
 }
+
+
+config.PublicIp=config.domain
 
 console.log("Config: " + JSON.stringify(config, null, '\t'));
 
@@ -105,6 +137,9 @@ var serverPublicIp;
 // Example of STUN server setting
 // let clientConfig = {peerConnectionOptions: { 'iceServers': [{'urls': ['stun:34.250.222.95:19302']}] }};
 var clientConfig = { type: 'config', peerConnectionOptions: {} };
+
+clientConfig.peerConnectionOptions=config.TurnCredentials;
+
 
 // Parse public server address from command line
 // --publicIp <public address>
@@ -256,7 +291,20 @@ if(config.EnableWebserver) {
 		return;
 	});
 }
-
+//https://aldar-staging.eaglepixelstreaming.com:4431/getServerDetails
+app.get('/getServerDetails', function (req, res) {
+    config.numberofPlayers = players.size
+    res.send(JSON.stringify(config))
+    
+    
+  });
+  
+app.get('/kickAllUsersFromSS', function (req, res) {
+		
+		kickAllUsers(res)
+		
+	});
+	
 //Setup http and https servers
 http.listen(httpPort, function () {
 	console.logColor(logging.Green, 'Http listening on *: ' + httpPort);
@@ -516,6 +564,17 @@ playerServer.on('connection', function (ws, req) {
 		ws.close(1013 /* Try again later */, 'Streamer is not connected');
 		return;
 	}
+	console.logColor(logging.Blue, `players.size: ${players.size}`);
+	if( players && players.size >= 1) 
+		{
+			var message="Intrueder detected while players.size"+players.size
+			//postToTelegram(message) 
+			console.logColor(logging.Red, message);
+
+			ws.close(1013 /* Try again later */, 'Server already occupied');
+			return 
+		}
+		
 
 	var url = require('url');
 	const parsedUrl = url.parse(req.url);
@@ -606,11 +665,21 @@ playerServer.on('connection', function (ws, req) {
 		} catch(err) {
 			console.logColor(logging.Red, `ERROR:: onPlayerDisconnected error: ${err.message}`);
 		}
+		
+		if( !players || players.size <= 0) 
+		{
+			 //restartApp() 
+			 restartUnrealApp()
+		}
+		
 	}
 
 	ws.on('close', function(code, reason) {
 		console.logColor(logging.Yellow, `player ${playerId} connection closed: ${code} - ${reason}`);
 		onPlayerDisconnected();
+		
+		//setTimeout(stoptUnrealApp, 500);
+		
 	});
 
 	ws.on('error', function(error) {
@@ -654,8 +723,59 @@ function disconnectSFUPlayer() {
  * Function that handles the connection to the matchmaker.
  */
 
+
+function kickAllUsers(res) 
+{
+		let playersCopy = new Map(players);
+			for (let p of playersCopy.values()) 
+			{
+				
+					console.log(`kicking player ${p.id}`)
+					p.ws.close(4000, 'kicked');
+				
+			}
+			console.logColor(logging.Red, 'kicked cmd executed ' );
+
+			if(res)
+				res.send("kicked cmd executed")
+			
+			
+}
+	
+	
+	
 if (config.UseMatchmaker) {
 	var matchmaker = new net.Socket();
+
+matchmaker.on('data', (data) => {
+
+try {
+			message = JSON.parse(data);
+
+			if(message)
+				console.log(`Message TYPE: ${message.type}`);
+		}
+		catch(e) 
+		{
+			console.log(data);
+			console.log(data.toString());
+			console.log(`ERROR (${e.toString()}): Failed to parse matchmaker information from data: ${data.toString()}`);
+			disconnectAllPlayers();
+			return;
+		}
+		
+		var sfsf='mm-->ss: ' + JSON.stringify(message)
+		
+		if (message.type === 'kickAllUsers') 
+		{
+			kickAllUsers()
+			
+			
+		}
+			
+}
+)
+
 
 	matchmaker.on('connect', function() {
 		console.log(`Cirrus connected to Matchmaker ${matchmakerAddress}:${matchmakerPort}`);
@@ -675,6 +795,8 @@ if (config.UseMatchmaker) {
 			type: 'connect',
 			address: typeof serverPublicIp === 'undefined' ? '127.0.0.1' : serverPublicIp,
 			port: httpPort,
+			HttpsPort: config.HttpsPort,
+			domain: config.domain,
 			ready: streamer && streamer.readyState === 1,
 			playerConnected: playerConnected
 		};
@@ -683,19 +805,32 @@ if (config.UseMatchmaker) {
 	});
 
 	matchmaker.on('error', (err) => {
-		console.log(`Matchmaker connection error ${JSON.stringify(err)}`);
+		var message=`Matchmaker connection error ${JSON.stringify(err)}`
+		//postToTelegram(message) 
+		
+		console.log(message);
 	});
 
 	matchmaker.on('end', () => {
-		console.log('Matchmaker connection ended');
+		
+		
+		var message='Matchmaker connection ended'
+		//postToTelegram(message) 
+		
+		console.log(message);
 	});
 
 	matchmaker.on('close', (hadError) => {
 		console.logColor(logging.Blue, 'Setting Keep Alive to true');
         matchmaker.setKeepAlive(true, 60000); // Keeps it alive for 60 seconds
 		
-		console.log(`Matchmaker connection closed (hadError=${hadError})`);
+		
 
+		var message=`Matchmaker connection closed (hadError=${hadError})`
+		//postToTelegram(message) 
+		
+		console.log(message);
+		
 		reconnect();
 	});
 
@@ -910,9 +1045,12 @@ function sendPlayerConnectedToMatchmaker() {
 		return;
 	try {
 		message = {
-			type: 'clientConnected'
+			type: 'clientConnected',
+			numplayer:players.size
 		};
 		matchmaker.write(JSON.stringify(message));
+		console.logColor(logging.Red, "SS-->mm : "+JSON.stringify(message));
+		
 	} catch (err) {
 		console.logColor(logging.Red, `ERROR sending clientConnected: ${err.message}`);
 	}
@@ -925,10 +1063,778 @@ function sendPlayerDisconnectedToMatchmaker() {
 		return;
 	try {
 		message = {
-			type: 'clientDisconnected'
+			type: 'clientDisconnected',
+			numplayer:players.size
 		};
 		matchmaker.write(JSON.stringify(message));
+		console.logColor(logging.Red, "SS-->mm : "+JSON.stringify(message));
 	} catch (err) {
 		console.logColor(logging.Red, `ERROR sending clientDisconnected: ${err.message}`);
 	}
 }
+
+/////////////////////////Ahsan//////////////////////
+const request = require('request')
+var ue4Process=undefined
+var currentVersion=-1
+var exeDirectory=config.exeDirectory
+var isupdateonProcess=false
+var owner=config.owner//"ruya"
+var app=config.app//"EagleStreamingMechns"
+var axios = require("axios");
+var AppDataProvidedBySS={
+													owner:"",
+													AppName:"",
+													version:""
+													
+												}
+
+
+function getAppDetails()
+{
+	AppDataProvidedBySS.version=18
+ var ue4AppExe =
+                    exeDirectory +
+                    config.owner +
+                    "\\" + config.app +
+                    "\\" + AppDataProvidedBySS.version + "\\" + config.app + ".exe"
+  console.log("ue4AppExe : " + ue4AppExe);
+                if (fs.existsSync(ue4AppExe))
+                {
+                    if (!streamer || streamer.readyState != 1)
+                        //restartApp() 	
+                        StartUnrealApp("ue4")
+
+                }
+                else
+                {
+					/*  var downloadFolder = exeDirectory + dirname + "/temp_" + version + "/"
+					 
+								//postToTelegram("a new version detected: "+
+								//oldversion
+								//+" --> "
+								//+AppDataProvidedBySS.version
+								//) 
+                    isupdateonProcess = true
+
+                    ensureDirectoryExistence(downloadFolder + "dummyFile")
+
+                    const downloadpath = downloadFolder + Path.basename(max.filename)
+                    console.log("downloadpath : " + downloadpath);
+
+                    downloadFile(max.url,
+                        downloadpath,
+                        downloadFolder, AppDataProvidedBySS
+                    );
+ */
+
+
+                }
+				
+				return
+    const axiosConfig = {
+      headers: {
+        'Content-Type': 'application/json', 
+        'Ocp-Apim-Subscription-Key': config.SubKey
+      },
+    };
+
+    var url = config.APIendpoint + config.owner + "/" + config.app
+
+
+    console.log("getAppDetails() url :" + url);
+
+    let flag =
+        axios.get(url, axiosConfig)
+        .then(
+            (result) =>
+            {
+                 //console.log("getAppDetails result.data : "+JSON.stringify(result.data) );
+                // console.log("getAppDetails result.data : "+JSON.stringify(result.data.data) );
+                // console.log("getAppDetails result.data : "+JSON.stringify(result.data.data.blobs) );
+                //console.log("getAppDetails result.data : "+JSON.stringify(result.data.data.blobs) )
+
+				if(result== undefined)
+					return
+
+
+                var array = result.data.data["blobs"];
+                array = result.data.data["blobs"][0];
+                //console.log(typeof array);
+                //console.log("getAppDetails console : "+JSON.stringify(array) )
+
+                //console.log("length  : "+result.data.data["blobs"].length );
+                var maxVersion = -1
+                var max = undefined
+				if(result.data.data["blobs"].length<=0)
+				{
+					console.log("no uploaded file found " );
+					return
+				}
+                for (var i = 0; i < result.data.data["blobs"].length; i++)
+                {
+                    var fsgsgsg = result.data.data["blobs"][i]
+                    //console.log("fsgsgsg: "+JSON.stringify(fsgsgsg) );
+                    var n = parseInt(Path.parse(fsgsgsg.filename).name)
+                    if (maxVersion < n)
+                    {
+                        maxVersion = n
+                        max = fsgsgsg
+                    }
+
+                }
+
+
+                //console.log("getAppDetails max : "+JSON.stringify(max) );
+                //console.log("getAppDetails max.url : " + max.url);
+
+
+
+                var version = Path.parse(max.filename).name
+
+                if (currentVersion != -1)
+                {
+                    if (version != currentVersion)
+                    {
+                        console.log("new version available currentVersion : " + currentVersion);
+                        console.logColor(logging.Blue, "new version available version : " + version);
+                    }
+
+                }
+
+
+				var oldversion=AppDataProvidedBySS.version
+               // AppDataProvidedBySS.owner = owner,
+                //    AppDataProvidedBySS.AppName = app,
+                    AppDataProvidedBySS.version = version
+
+
+
+
+                var dirname = Path.dirname(max.filename)
+
+
+
+               
+
+                //console.log("downloadFolder : "+downloadFolder );
+                //console.log("version : "+version );
+                //console.log("dirname : "+dirname );
+
+
+                var ue4AppExe =
+                    exeDirectory +
+                    config.owner +
+                    "\\" + config.app +
+                    "\\" + AppDataProvidedBySS.version + "\\" + config.app + ".exe"
+
+                if (fs.existsSync(ue4AppExe))
+                {
+                    if (!streamer || streamer.readyState != 1)
+                        //restartApp() 	
+                        StartUnrealApp("ue4")
+
+                }
+                else
+                {
+					 var downloadFolder = exeDirectory + dirname + "/temp_" + version + "/"
+					 
+								//postToTelegram("a new version detected: "+
+								//oldversion
+								//+" --> "
+								//+AppDataProvidedBySS.version
+								//) 
+                    isupdateonProcess = true
+
+                    ensureDirectoryExistence(downloadFolder + "dummyFile")
+
+                    const downloadpath = downloadFolder + Path.basename(max.filename)
+                    console.log("downloadpath : " + downloadpath);
+
+                    downloadFile(max.url,
+                        downloadpath,
+                        downloadFolder, AppDataProvidedBySS
+                    );
+
+
+
+                }
+
+
+                return result.data
+            }
+        )
+
+        .catch((err) =>
+        {
+            console.log(
+                "  err:" + err
+            );
+        });
+
+    //console.log("flag : "+flag );		
+}
+
+function extractUsing7Zip(downloadFilePath, downloadFolder, AppDataProvidedBySS) //2do-downloadFilePath to downloadedFilePath
+{
+    var sevenzip = require('@steezcram/sevenzip');
+    var n = AppDataProvidedBySS.version
+    var tttt = downloadFolder
+    var isAdminDebugging = true
+
+
+    var lastprogressState = undefined;
+    var shouldDoProgressUpdate = true
+    if (isAdminDebugging)
+    {
+        shouldDoProgressUpdate = true
+    }
+
+
+    sevenzip.extract('7z',
+        {
+            archive: downloadFilePath,
+            destination: downloadFolder
+        },
+        (err) =>
+        {
+            if (err)
+                throw err;
+
+            isupdateonProcess = false
+
+
+            var dfsfgsf = JSON.stringify(err)
+
+            console.log("SevenZipStream : error:" + dfsfgsf);
+
+
+
+            console.log(err);
+
+
+
+
+        },
+        (progress) =>
+        {
+            console.log(progress);
+            lastprogressState = progress;
+
+
+
+            var obj = {
+                type: "AppPreparationData",
+                data:
+                {
+                    percent: progress.progress
+                }
+            }
+            var dfsfgsf = JSON.stringify(obj)
+            sendMessageToPlayers(dfsfgsf)
+
+            console.log(dfsfgsf);
+
+            if (progress.progress >= 100)
+            {
+
+                console.logColor(logging.Blue, "Extraction finished******************");
+
+                if (lastprogressState && lastprogressState.percent < 90)
+                {
+                    console.log("SevenZipStream-->end: skipping lunch bcz. lastprogressState:--> " + JSON.stringify(lastprogressState))
+                    //return;
+                }
+
+
+
+                var obj = {
+                    datatype: "type",
+                    data:
+
+                    {
+
+
+                        "percent": 100,
+                        "ahsanMademessage": "SevenZipStream.onEnd"
+
+                    }
+
+
+
+                }
+                var dfsfgsf = JSON.stringify(obj)
+                sendMessageToPlayers(dfsfgsf)
+                console.log("SevenZipStream : Extraction end");
+
+
+
+                var ttttt2 = exeDirectory +
+                    "\\" + config.owner + "\\" + config.app +
+                    "\\" + AppDataProvidedBySS.version + "\\"
+
+                messageToSend = 'starting rename   from: ' + tttt + 'to :' + ttttt2
+                //var ttttt2=exeDirectory+"\\"+data.AppInfoRequested2Linker.owner+"\\"+ data.parentFolder+ "\\"+ path.parse(data.filename).name+ "\\"
+
+
+                fs.rename(tttt, ttttt2, function(err)
+                {
+                    if (err)
+                    {
+                        console.log(err);
+
+                        return; //2do--add all clean up  related code
+                    }
+                    else
+                    {
+                        messageToSend = 'SevenZipStream : 222renamed complete from: ' + tttt + 'to :' + ttttt2
+                        console.logColor(logging.Blue, messageToSend);
+                        //sendMesage2DownloadWaittingList(messageToSend,CompanyName,AppName,n)
+
+                        var zipFIleTodetele = ttttt2 + AppDataProvidedBySS.version + ".zip"
+                        onExePrepared(zipFIleTodetele, AppDataProvidedBySS)
+
+                    }
+
+                });
+
+
+
+
+            }
+
+
+        });
+
+}
+
+
+function ensureDirectoryExistence(filePath) 
+{
+	// console.log('ensureDirectoryExistence: ' +filePath );
+									
+  var dirname = path.dirname(filePath);
+  if (fs.existsSync(dirname)) 
+  {
+    return true;
+  }
+  ensureDirectoryExistence(dirname);
+  fs.mkdirSync(dirname);
+}
+
+
+function deleteFile(path) 
+{
+
+	if (path) 
+	{
+	  fs.access(path, 
+	  // fs.constants.R_OK | fs.constants.W_OK
+	  fs.R_OK && fs.W_OK
+	  
+	  , function(err) 
+	  {
+		   if (err) 
+		   {
+			 console.log("deleteFile() Cannot delete this folder:"+path)
+			 console.log(err);
+			 
+			 setTimeout(function () 
+												{	 
+													deleteFile(path) 
+																			
+												}
+													, 5000
+											); 
+											
+		   } 
+		   else 
+		   {
+					fs.unlink(path,function(err)
+					{
+						if(err)
+						{
+							if(err.code == 'ENOENT') 
+							{
+								// file doens't exist
+								console.info("deleteFile() File doesn't exist, won't remove it.");
+							} 
+							else
+							{
+								
+								
+								setTimeout(function () 
+												{	 
+													deleteFile(path) 
+																			
+												}
+													, 5000
+											); 
+																			
+								
+							}
+							 
+								console.log(err);
+						 
+						}
+						else
+						{
+						
+						console.log('deleteFile() file deleted successfully '+path);
+						}
+					});  
+		   }
+	  }
+	  
+	  
+	  
+	  
+	  );
+	}
+ 
+
+}
+
+
+			 
+getAppDetails() 
+
+setInterval(
+			function() 
+			{
+				//console.log("xxxxxxxxxxxxxxxxx isupdateonProcess: "+isupdateonProcess);
+				if(!isupdateonProcess)
+					getAppDetails()
+				else
+					console.log("skipping getAppDetails bcz isupdateonProcess: "+isupdateonProcess);
+			 }, 10 * 1000);
+
+
+
+function onExePrepared(zipFIleTodetele,AppDataProvidedBySS)
+{
+	isupdateonProcess=false	
+	deleteFile(zipFIleTodetele) 		
+	restartUnrealApp() 
+		
+}
+
+
+function sendMessageToPlayers(message)
+{
+	for (let p of players.values()) 
+	{
+			p.ws.send(message);
+		}
+}
+
+			 
+function downloadFile(file_url , targetPath,
+									downloadFolder,AppDataProvidedBySS)
+{
+	isupdateonProcess=true
+	
+    // Save variable to know progress
+    var received_bytes = 0;
+    var total_bytes = 0;
+
+    var req = request({
+        method: 'GET',
+        uri: file_url
+    });
+
+    var out = fs.createWriteStream(targetPath);
+    req.pipe(out);
+
+    req.on('response', function ( data ) {
+        // Change the total bytes value to get progress later.
+        total_bytes = parseInt(data.headers['content-length' ]);
+    });
+
+    req.on('data', function(chunk) {
+        // Update the received bytes
+        received_bytes += chunk.length;
+
+        showProgress(received_bytes, total_bytes);
+    });
+
+    req.on('end', function() {
+        console.log("File succesfully downloaded");
+		
+		 var obj={type:"AppAcquiringData",
+						 data:{
+														  
+														  
+								"percent": 100,
+								"ahsanMademessage":"request-progressToDownload.onEnd"
+														 
+							}
+						 
+						 
+						 }
+						 var dfsfgsf=JSON.stringify(obj)
+													 
+						sendMessageToPlayers( dfsfgsf)	
+						
+						
+		 setTimeout(		
+		 function () //give downlapoder some time to save in disk
+			{
+																									
+				extractUsing7Zip(targetPath,downloadFolder,AppDataProvidedBySS)
+			}, 
+			5000)
+										
+										
+    });
+}
+
+
+function showProgress(received,total){
+    var percentage = (received * 100) / total;
+    console.log(percentage + "% | " + received + " bytes out of " + total + " bytes.");
+    // 50% | 50000 bytes received out of 100000 bytes.
+	
+	
+		 var obj={type:"AppAcquiringData",
+						 data:{
+														  
+														  
+								"percent": percentage,
+								"ahsanMademessage":"request-progressToDownload.onEnd"
+														 
+							}
+						 
+						 
+						 }
+						 var dfsfgsf=JSON.stringify(obj)
+													 
+						sendMessageToPlayers( dfsfgsf)	
+		
+}
+
+
+function restartUnrealApp() 
+{
+	stoptUnrealApp(true) 
+}
+function stoptUnrealApp(shouldRestart=false) 
+{
+	if (!streamer)
+		{
+			console.logColor(logging.Red,"stoptUnrealApp() streamer undefined. so no exe to stop.   " );
+			console.logColor(logging.Red,"stoptUnrealApp() shouldRestart:   "+shouldRestart );
+				if(shouldRestart)
+					StartUnrealApp()
+			return
+		}
+		
+		
+		// Call the restart PowerShell script only if all players have disconnected
+		if(players.size == 0) 
+		{
+			try {
+				var spawn = require("child_process").spawn,child;
+				
+				
+				
+				var cmd= ".\\StopApp.ps1 "
+						+app+" "
+						+ config.StreamerPort+" "
+						+0 
+						
+						
+				console.logColor(logging.Blue,"stoptUnrealApp() cmd : "+cmd );
+				child = spawn("powershell.exe",[cmd]);
+				
+				child.stdout.on("data", function(data) {
+					console.log("stoptUnrealApp PowerShell Data: " + data);
+					
+					if(data== "Process killed")
+					{
+									if (streamer)
+									{
+										console.logColor(logging.Blue,"stoptUnrealApp() Process killed. yes. streamer killed " );
+										
+										
+									}
+									else
+										console.logColor(logging.Blue,"stoptUnrealApp() Process killed. . streamer stilol running  " );
+					}
+				});
+				child.stderr.on("data", function(data) {
+					console.log("stoptUnrealApp PowerShell Errors: " + data);
+				});
+				child.on("exit",function(){
+					console.log("stoptUnrealApp The PowerShell script complete.");
+					if(shouldRestart)
+						StartUnrealApp()
+				});
+				child.stdin.end();
+			} catch(e) {
+				console.log(`stoptUnrealApp ERROR: Errors executing PowerShell with message: ${e.toString()}`);
+				ai.logError(e);	//////// AZURE ////////
+			}
+		}
+}
+
+var isLunchingStramer=false
+function StartUnrealApp() 
+{
+		if (streamer)
+		{
+			console.logColor(logging.Red,"StartUnrealApp() but stramer connected. excuting restartUnrealApp()  " );
+			restartUnrealApp()
+			return
+		}
+		console.logColor(logging.Red,"StartUnrealApp() isLunchingStramer:  "+isLunchingStramer );
+		if(isLunchingStramer)
+			return
+		
+		console.trace()
+			try 
+			{
+				isLunchingStramer=true
+				var spawn = require("child_process").spawn,child;
+				// TODO: Need to pass in a config path to this for more robustness and not hard coded
+				
+		
+				var pathtoexec	=  
+						exeDirectory 
+						+config.owner
+						+"\\"+config.app
+						+"\\"
+						+AppDataProvidedBySS.version+"\\"+config.app+".exe" 
+									
+					console.log('33333333333  pathtoexec: ' + pathtoexec);
+					
+					if (fs.existsSync(pathtoexec))
+						{
+											
+						}
+						else
+						{
+							console.logColor(logging.Red,"StartUnrealApp() exe dont exist:  "+pathtoexec );
+							isLunchingStramer=false
+							return					
+						}
+						
+					var cmd= 
+						".\\StartApp.ps1 "
+						+pathtoexec+" "
+						+ config.StreamerPort
+						
+					console.log(cmd);	
+				
+				
+				
+				child = spawn("powershell.exe",[cmd]);
+				
+				child.stdout.on("data", function(data) {
+					//console.log("PowerShell Data: " + data);
+				});
+				child.stderr.on("data", function(data) {
+					//console.log("PowerShell Errors: " + data);
+				});
+				child.on("exit",function(){
+					//isLunchingStramer=false
+					console.log("StartUnrealApp The PowerShell script complete.");
+				});
+				child.stdin.end();
+				
+				ue4Process=child
+				
+			} catch(e) {
+				console.log(`StartUnrealApp ERROR: Errors executing PowerShell with message: ${e.toString()}`);
+				ai.logError(e);	//////// AZURE ////////
+			}
+		
+}
+
+//https://stackoverflow.com/questions/31673587/error-unable-to-verify-the-first-certificate-in-nodejs
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0
+function checkStatusInMM()
+{
+//https://mmkr-snbx.jllmena.me/getAllCS
+//https://mps3.eaglepixelstreaming.com/getAllCS
+//https://aldar-staging.eaglepixelstreaming.com:4430/getAllCS
+//http://aldar-staging.eaglepixelstreaming.com:33891/getAllCS
+    var url = "https://"+config.MatchmakerAddress+":"+config.MatchmakerHttpsPort + "/getAllCS"
+    //https://files-api.eaglepixelstreaming.com/api/v1/files/ruya/EagleStreamingMechns/
+
+
+    console.log("checkStatusInMM() url :" + url);
+
+
+
+// var https2 = require('https');
+// var rootCas = require('ssl-root-cas').create();
+
+// rootCas.addFile(path.join(__dirname, './certificates/client-key.pem'));
+// var httpsAgent2 = new https2.Agent({ca: rootCas});
+
+// const httpsAgent2 = new require("https").Agent({
+  // rejectUnauthorized: true,
+// });
+  
+  
+    let flag =
+        axios.get(
+		url 
+		//	, { httpsAgent2 }
+		)
+        .then(
+            (result) =>
+            {
+                // console.log("getAppDetails result.data : "+JSON.stringify(result) );
+                 //console.log("getAppDetails result.data : "+JSON.stringify(result.data) );
+                
+				
+for(i=0;i<result.data.length;i++)
+{
+	/* console.log(result.data[i].domain);
+	console.log(config.domain);
+	
+		console.log(result.data[i].port);
+	console.log(config.HttpPort);
+		console.log(result.data[i].HttpsPort);
+	console.log(config.HttpsPort); */
+	
+	if(
+	(result.data[i].domain==config.domain)
+	&&(result.data[i].port==config.HttpPort)
+	&&(result.data[i].HttpsPort==config.HttpsPort)
+	)
+	{
+		console.log("found" );
+		
+		if(result.data[i].numConnectedClients != players.size)
+		{
+			console.logColor(logging.Red, "result.data[i].numConnectedClients : "+result.data[i].numConnectedClients);
+			console.logColor(logging.Red, "players.size : "+players.size);
+		}
+		
+		break
+	}
+	
+	
+	
+}
+
+
+               
+            }
+        )
+
+        .catch((err) =>
+        {
+            console.log(
+                " checkStatusInMM() err:" + err
+            );
+        });
+
+   
+}
+setInterval(function() 
+		{checkStatusInMM()
+		}, 5 * 1000);
