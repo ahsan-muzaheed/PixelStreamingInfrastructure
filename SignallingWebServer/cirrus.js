@@ -1090,7 +1090,7 @@ var AppDataProvidedBySS={
 												}
 
 
-function getAppDetails()
+function getAppDetails1()
 {
 	AppDataProvidedBySS.version=18
  var ue4AppExe =
@@ -1274,6 +1274,154 @@ function getAppDetails()
 
     //console.log("flag : "+flag );		
 }
+
+
+function getAppDetails()
+{
+	
+    const axiosConfig = {
+      headers: {
+        'Content-Type': 'application/json', 
+        'Ocp-Apim-Subscription-Key': config.SubKey
+      },
+    };
+
+    var url = config.APIendpoint + config.owner + "/" + config.app
+
+
+    console.log("getAppDetails() url :" + url);
+
+    let flag =
+        axios.get(url, axiosConfig)
+        .then(
+            (result) =>
+            {
+                 //console.log("getAppDetails result.data : "+JSON.stringify(result.data) );
+                // console.log("getAppDetails result.data : "+JSON.stringify(result.data.data) );
+                // console.log("getAppDetails result.data : "+JSON.stringify(result.data.data.blobs) );
+                //console.log("getAppDetails result.data : "+JSON.stringify(result.data.data.blobs) )
+
+				if(result== undefined)
+					return
+
+
+                var array = result.data.data["blobs"];
+                array = result.data.data["blobs"][0];
+                //console.log(typeof array);
+                //console.log("getAppDetails console : "+JSON.stringify(array) )
+
+                //console.log("length  : "+result.data.data["blobs"].length );
+                var maxVersion = -1
+                var max = undefined
+				if(result.data.data["blobs"].length<=0)
+				{
+					console.log("no uploaded file found " );
+					return
+				}
+                for (var i = 0; i < result.data.data["blobs"].length; i++)
+                {
+                    var fsgsgsg = result.data.data["blobs"][i]
+                    //console.log("fsgsgsg: "+JSON.stringify(fsgsgsg) );
+                    var n = parseInt(Path.parse(fsgsgsg.filename).name)
+                    if (maxVersion < n)
+                    {
+                        maxVersion = n
+                        max = fsgsgsg
+                    }
+
+                }
+
+
+                //console.log("getAppDetails max : "+JSON.stringify(max) );
+                //console.log("getAppDetails max.url : " + max.url);
+
+
+
+                var version = Path.parse(max.filename).name
+
+                if (currentVersion != -1)
+                {
+                    if (version != currentVersion)
+                    {
+                        console.log("new version available currentVersion : " + currentVersion);
+                        console.logColor(logging.Blue, "new version available version : " + version);
+                    }
+
+                }
+
+
+				var oldversion=AppDataProvidedBySS.version
+               // AppDataProvidedBySS.owner = owner,
+                //    AppDataProvidedBySS.AppName = app,
+                    AppDataProvidedBySS.version = version
+
+
+
+
+                var dirname = Path.dirname(max.filename)
+
+
+
+               
+
+                //console.log("downloadFolder : "+downloadFolder );
+                //console.log("version : "+version );
+                //console.log("dirname : "+dirname );
+
+
+                var ue4AppExe =
+                    exeDirectory +
+                    config.owner +
+                    "\\" + config.app +
+                    "\\" + AppDataProvidedBySS.version + "\\" + config.app + ".exe"
+
+                if (fs.existsSync(ue4AppExe))
+                {
+                    if (!streamer || streamer.readyState != 1)
+                        //restartApp() 	
+                        StartUnrealApp("ue4")
+
+                }
+                else
+                {
+					 var downloadFolder = exeDirectory + dirname + "/temp_" + version + "/"
+					 
+								//postToTelegram("a new version detected: "+
+								//oldversion
+								//+" --> "
+								//+AppDataProvidedBySS.version
+								//) 
+                    isupdateonProcess = true
+
+                    ensureDirectoryExistence(downloadFolder + "dummyFile")
+
+                    const downloadpath = downloadFolder + Path.basename(max.filename)
+                    console.log("downloadpath : " + downloadpath);
+
+                    downloadFile(max.url,
+                        downloadpath,
+                        downloadFolder, AppDataProvidedBySS
+                    );
+
+
+
+                }
+
+
+                return result.data
+            }
+        )
+
+        .catch((err) =>
+        {
+            console.log(
+                "  err:" + err
+            );
+        });
+
+    //console.log("flag : "+flag );		
+}
+
 
 function extractUsing7Zip(downloadFilePath, downloadFolder, AppDataProvidedBySS) //2do-downloadFilePath to downloadedFilePath
 {

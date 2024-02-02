@@ -1,19 +1,37 @@
+
+
+
 {
-	"UseFrontend": false,
-	"UseMatchmaker": false,
-	"UseHTTPS": false,
-	"UseAuthentication": false,
-	"LogToFile": true,
-	"LogVerbose": true,
-	"HomepageFile": "player.html",
-	"AdditionalRoutes": {},
-	"EnableWebserver": true,
-	"MatchmakerAddress": "",
-	"MatchmakerPort": "9999",
-	"PublicIp": "localhost",
-	"HttpPort": 80,
-	"HttpsPort": 443,
-	"StreamerPort": 8888,
-	"SFUPort": 8889,
-	"MaxPlayerCount": -1
+	
+	"MatchmakerAddress": "mmkr-demo.jllmena.me",
+	"domain": "st-demo-3.jllmena.me",
+	"owner": "jlldemouefive", 
+	"owner1": "demo", 
+	"app1": "3DViewer",
+	"app": "EagleStreamingMechns",
+	"APIendpoint": "https://api-snbx.jllmena.me/upload/v1/files/",
+	"SubKey": "4ef496de9f604e5781959a1877fb8f4c",
+"TurnCredentials":
+{
+  "iceServers": [
+    {
+      "urls": [
+        "stun:ss-turn2.xirsys.com"
+      ]
+    },
+    {
+      "username": "WJ4ZmfzMw11zZDHKpSyhEPfvZRD6NLx7aifLxaXx-fi4Xn5iMYZxNfU1Ivlibl0gAAAAAGU6Xdd0c2l5YWRh",
+      "credential": "9b60b322-73fc-11ee-9c45-0242ac140004",
+      "urls": [
+        "turn:ss-turn2.xirsys.com:80?transport=udp",
+        "turn:ss-turn2.xirsys.com:3478?transport=udp",
+        "turn:ss-turn2.xirsys.com:80?transport=tcp",
+        "turn:ss-turn2.xirsys.com:3478?transport=tcp",
+        "turns:ss-turn2.xirsys.com:443?transport=tcp",
+        "turns:ss-turn2.xirsys.com:5349?transport=tcp"
+      ]
+    }
+  ]
+}
+	
 }
