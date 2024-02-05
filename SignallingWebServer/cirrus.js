@@ -800,8 +800,11 @@ try {
 			ready: streamer && streamer.readyState === 1,
 			playerConnected: playerConnected
 		};
-
-		matchmaker.write(JSON.stringify(message));
+			var message=JSON.stringify(message)
+		//postToTelegram(message) 
+		
+		console.log("ss-Mmm: "+message);
+		matchmaker.write(message);
 	});
 
 	matchmaker.on('error', (err) => {

@@ -20,7 +20,7 @@ function initConfig(configFile, defaultConfig){
 		try {
 			accessSync('configFile', constants.W_OK);
 			// Update config file with any additional defaults (does not override existing values if default has changed)
-			fs.writeFileSync(configFile, JSON.stringify(config, null, '\t'), 'UTF8');
+			//fs.writeFileSync(configFile, JSON.stringify(config, null, '\t'), 'UTF8');
 		} catch (err) {
 			console.log("Config file is readonly, skipping writing config...");
 		}
