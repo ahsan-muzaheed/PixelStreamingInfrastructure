@@ -5,6 +5,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.16.2",
+    "helmet": "^7.1.0",
     "socket.io": "4.4.1",
     "yargs": "17.3.1"
   }

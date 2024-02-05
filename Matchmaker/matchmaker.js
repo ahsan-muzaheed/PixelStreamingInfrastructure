@@ -29,6 +29,18 @@ const fs = require('fs');
 const path = require('path');
 const logging = require('./modules/logging.js');
 logging.RegisterConsoleLogger();
+app.use(cors());
+const helmet = require("helmet");
+app.use(
+    helmet({
+      frameguard: false,
+
+      //https://stackoverflow.com/questions/21048252/nodejs-where-exactly-can-i-put-the-content-security-policy
+      //https://helmetjs.github.io/
+      //// This disables the `contentSecurityPolicy` middleware but keeps the rest.
+      contentSecurityPolicy: false,
+    })
+  ); 
 
 if (config.LogToFile) {
 	logging.RegisterFileLogger('./logs');
@@ -108,11 +120,11 @@ function getAvailableCirrusServer() {
 	for (cirrusServer of cirrusServers.values()) {
 		if (cirrusServer.numConnectedClients === 0 && cirrusServer.ready === true) {
 
-			// Check if we had at least 10 seconds since the last redirect, avoiding the 
+			// Check if we had at least 45 seconds since the last redirect, avoiding the 
 			// chance of redirecting 2+ users to the same SS before they click Play.
 			// In other words, give the user 10 seconds to click play button the claim the server.
 			if( cirrusServer.hasOwnProperty('lastRedirect')) {
-				if( ((Date.now() - cirrusServer.lastRedirect) / 1000) < 10 )
+				if( ((Date.now() - cirrusServer.lastRedirect) / 1000) < 45 )
 					continue;
 			}
 			cirrusServer.lastRedirect = Date.now();
@@ -123,6 +135,89 @@ function getAvailableCirrusServer() {
 	
 	console.log('WARNING: No empty Cirrus servers are available');
 	return undefined;
+}
+
+
+function getAllCirrusServer() 
+{
+	 var freecs=[]
+	for (cirrusServer of cirrusServers.values()) 
+	{
+		
+		//if (cirrusServer.numConnectedClients === 0 && cirrusServer.ready === true) 
+		//{
+
+			// Check if we had at least 45 seconds since the last redirect, avoiding the 
+			// chance of redirecting 2+ users to the same SS before they click Play.
+			/*  if( cirrusServer.lastRedirect ) 
+			{
+				if( ((Date.now() - cirrusServer.lastRedirect) / 1000) < 45 )
+					continue;
+			}  */
+			
+
+			freecs.push(cirrusServer)
+		//} 
+		
+		
+	} 
+	
+	
+	return freecs;
+}
+
+
+function kickAllUsers(res) 
+{
+	 var freecs=[]
+	  for (var [key, value] of cirrusServers.entries())
+    {
+	//for (cirrusServer of cirrusServers.values()) 
+	//{
+		
+		//let server = [...cirrusServers.entries()].find(([key, val]) => val.address === cirrusServer.address && val.port === cirrusServer.port);
+
+		message = {
+			type: 'kickAllUsers'
+		};
+		key.write(JSON.stringify(message));
+		
+		
+		
+	//}
+	}	
+	
+	res.send("kickAllUsers excusted in all servers")
+	
+}
+
+
+function getAllFreeCirrusServer() 
+{
+	var freecs=[]
+	for (cirrusServer of cirrusServers.values()) 
+	{
+		
+		if (cirrusServer.numConnectedClients === 0 && cirrusServer.ready === true) 
+		{
+
+			// Check if we had at least 45 seconds since the last redirect, avoiding the 
+			// chance of redirecting 2+ users to the same SS before they click Play.
+			if( cirrusServer.lastRedirect ) 
+			{
+				if( ((Date.now() - cirrusServer.lastRedirect) / 1000) < 45 )
+					continue;
+			}
+			
+
+			freecs.push(cirrusServer)
+		} 
+		
+		
+	}
+	
+	
+	return freecs;
 }
 
 if(enableRESTAPI) {
@@ -151,6 +246,28 @@ if(enableRedirectionLinks) {
 			sendRetryResponse(res);
 		}
 	});
+	app.get('/getFreeCS/', (req, res) => {
+		cirrusServer = getAllFreeCirrusServer();
+		res.json(cirrusServer)
+		
+	});
+
+	app.get('/getAllCS/', (req, res) => {
+		cirrusServer = getAllCirrusServer();
+		
+		console.log("cirrusServer: " + JSON.stringify(cirrusServer, null, '\t'));
+		
+		res.json(cirrusServer)
+		
+	});
+	
+	
+	app.get('/kickAllUsers/', (req, res) => {
+		cirrusServer = kickAllUsers(res);
+		
+		
+	});
+	
 
 	// Handle URL with custom HTML.
 	app.get('/custom_html/:htmlFilename', (req, res) => {
@@ -177,6 +294,7 @@ function disconnect(connection) {
 
 const matchmaker = net.createServer((connection) => {
 	connection.on('data', (data) => {
+		console.log(`data: ${data}`);
 		try {
 			message = JSON.parse(data);
 
@@ -184,17 +302,31 @@ const matchmaker = net.createServer((connection) => {
 				console.log(`Message TYPE: ${message.type}`);
 		} catch(e) {
 			console.log(`ERROR (${e.toString()}): Failed to parse Cirrus information from data: ${data.toString()}`);
+			console.log("message:");
+			console.log(data);
 			disconnect(connection);
 			return;
 		}
-		if (message.type === 'connect') {
+		
+		var sfsf='ss-->mm: ' + JSON.stringify(message)
+		
+		if (message.type === 'connect') 
+		{
+			
+			var kickUrl="https://"+message.domain+"/kickAllUsersFromSS/"
+			console.log(`kickUrl: ${kickUrl}`);
 			// A Cirrus server connects to this Matchmaker server.
 			cirrusServer = {
 				address: message.address,
 				port: message.port,
+				HttpsPort: message.HttpsPort,
+				domain: message.domain,
 				numConnectedClients: 0,
+				kickUrl:kickUrl,//https://mmkr-snbx.jllmena.me/kickAllUsers/
 				lastPingReceived: Date.now()
 			};
+			
+			connection.domain=message.domain
 			cirrusServer.ready = message.ready === true;
 
 			// Handles disconnects between MM and SS to not add dupes with numConnectedClients = 0 and redirect users to same SS
@@ -247,8 +379,9 @@ const matchmaker = net.createServer((connection) => {
 			// A client connects to a Cirrus server.
 			cirrusServer = cirrusServers.get(connection);
 			if(cirrusServer) {
-				cirrusServer.numConnectedClients++;
-				console.log(`Client connected to Cirrus server ${cirrusServer.address}:${cirrusServer.port}`);
+				//cirrusServer.numConnectedClients++;
+				cirrusServer.numConnectedClients=message.numplayer
+				console.log(`Client connected to Cirrus server ${cirrusServer.address}:${cirrusServer.port} ---> ${cirrusServer.numConnectedClients}`);
 			} else {
 				disconnect(connection);
 			}
@@ -256,7 +389,10 @@ const matchmaker = net.createServer((connection) => {
 			// A client disconnects from a Cirrus server.
 			cirrusServer = cirrusServers.get(connection);
 			if(cirrusServer) {
-				cirrusServer.numConnectedClients--;
+				//cirrusServer.numConnectedClients--;
+				cirrusServer.numConnectedClients=message.numplayer
+				console.log(`Client disconnected from Cirrus server ${cirrusServer.address}:${cirrusServer.port}---> ${cirrusServer.numConnectedClients}`);
+
 				console.log(`Client disconnected from Cirrus server ${cirrusServer.address}:${cirrusServer.port}`);
 				if(cirrusServer.numConnectedClients === 0) {
 					// this make this server immediately available for a new client
@@ -280,13 +416,30 @@ const matchmaker = net.createServer((connection) => {
 
 	// A Cirrus server disconnects from this Matchmaker server.
 	connection.on('error', () => {
+		//console.log("connection error:");
 		cirrusServer = cirrusServers.get(connection);
-		if(cirrusServer) {
-			cirrusServers.delete(connection);
-			console.log(`Cirrus server ${cirrusServer.address}:${cirrusServer.port} disconnected from Matchmaker`);
-		} else {
-			console.log(`Disconnected machine that wasn't a registered cirrus server, remote address: ${connection.remoteAddress}`);
+		var sfsgsg=""
+		if(cirrusServer)
+		{
+			if(cirrusServer.domain)
+				sfsgsg='Disconnected from MM.  ss: ' + cirrusServer.domain
+			else
+				sfsgsg='Disconnected from MM.  ss: ' + cirrusServer.address
+			
+				
+			
+				//sfsgsg=`Cirrus server ${cirrusServer.address}:${cirrusServer.port} disconnected from Matchmaker`
+				cirrusServers.delete(connection);
+			 console.log(sfsgsg);
 		}
+		else 
+			{
+				sfsgsg=`Disconnected machine that wasn't a registered cirrus server, remote address: ${connection.remoteAddress} -- > ${connection.domain}`
+				console.log(sfsgsg);
+				postToTelegram(sfsgsg)
+			}
+		
+		
 	});
 });
 
