@@ -2,7 +2,7 @@
 
 
 {
-	
+	"UseHTTPS": true,
 	"MatchmakerAddress1": "mmkr-demo.jllmena.me",
 	"MatchmakerAddress": "s10.eaglepixelstreaming.com",
 	"domain": "s10.eaglepixelstreaming.com",

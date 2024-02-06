@@ -48,6 +48,7 @@ const WS_OPEN_STATE = 1;
 
 let inputController = null;
 let autoPlayAudio = true;
+let needToKick = false;
 let qualityController = false;
 let qualityControlOwnershipCheckBox;
 let matchViewportResolution;
@@ -995,10 +996,14 @@ function showConnectOverlay() {
     startText.id = 'playButton';
     startText.innerHTML = 'Click to start'.toUpperCase();
 
-    setOverlay('clickableState', startText, event => {
+  /*   setOverlay('clickableState', startText, event => {
         connect();
         startAfkWarningTimer();
     });
+	 */
+	
+	communicateToMM();
+	startAfkWarningTimer();
 }
 
 function showTextOverlay(text) {
@@ -2548,9 +2553,114 @@ function start(isReconnection) {
     }
 }
 
-function connect() {
-    "use strict";
 
+var communicateToMMTimer = undefined;
+var streamerCounter = 0;
+function communicateToMM() {
+	 window.apiUrl="https:/s10.eaglepixelstreaming.com/"
+	//	var url = 'http://20.74.254.225:9500/getFreeCS/'; // Eagle 3D
+	var url = window.apiUrl + 'getFreeCS/'; // demo Env
+	//url = 'https://mm_alder_eagle.eaglepixelstreaming.com/getFreeCS/'; //eagle 3d
+	var xmlHttp = new XMLHttpRequest();
+	xmlHttp.successHappend = false;
+	xmlHttp.onreadystatechange = function () {
+		//console.log(xmlHttp.readyState);
+		//console.log(xmlHttp.status);
+		//console.log("communicateToMM()  xmlHttp.responseText: " + xmlHttp.responseText);
+
+		if (xmlHttp.status == 429) {
+			if (communicateToMMTimer != undefined) clearTimeout(communicateToMMTimer);
+
+			// console.log("11111111111111111setTimeout(communicateToMMTimer, 2000)");
+			communicateToMMTimer = setTimeout(communicateToMM, 2000);
+			return;
+		}
+
+		if (xmlHttp.status == 422) {
+			return;
+		}
+
+		if (
+			//xmlHttp.readyState == 4 &&
+
+			xmlHttp.responseText != '' &&
+			xmlHttp.responseText != undefined &&
+			xmlHttp.status == 200
+		) {
+			if (xmlHttp.successHappend) {
+				console.log('xmlHttp.successHappend already true . so skipping: ');
+				return;
+			}
+			xmlHttp.successHappend = true;
+
+			//console.log("success");
+			clearTimeout(communicateToMMTimer);
+
+			try {
+				var obj = JSON.parse(xmlHttp.responseText);
+				mmResponse = obj;
+				console.log('cs details: ' + JSON.stringify(obj));
+				//{"address":"99.60.91.140","port":800,"numConnectedClients":0,"lastPingReceived":1667063815941,"ready":true}
+
+				/* if(obj.error != undefined)
+        {
+          console.log("MM error: "+ obj.error);
+           communicateToMMTimer = setTimeout(communicateToMM, 2000);
+           xmlHttp.successHappend=false
+        }
+        else
+        { */
+				if (obj.length > 0) {
+					var fsgs = obj[0];
+					var sfsg = 'ws://' + fsgs.address + ':' + fsgs.port;
+					sfsg = 'wss://' + fsgs.domain + ':' + fsgs.HttpsPort;
+					window.kickUrl = fsgs.kickUrl;
+					connect(sfsg);
+				} else {
+					if (communicateToMMTimer !== undefined) clearTimeout(communicateToMMTimer);
+					console.log('No free streamer available. so trying again in 2sec');
+					streamerCounter++;
+					if (streamerCounter < 5) {
+						communicateToMMTimer = setTimeout(communicateToMM, 2000);
+					} else {
+						streamer_time_out = true;
+					}
+					xmlHttp.successHappend = false;
+				}
+
+				//}
+			} catch (objError) {
+				mmResponse = null;
+				console.log('communicateToMM  error responseText: ' + xmlHttp.responseText);
+				console.log('communicateToMM  objError: ' + objError);
+			}
+		} else {
+			//console.error("getInfo Request not successful", xmlHttp.readyState, xmlHttp.status);
+			//console.error("getInfo xmlHttp.responseText: ", xmlHttp.responseText);
+			if (communicateToMMTimer != undefined) clearTimeout(communicateToMMTimer);
+
+			console.log('MM unvailable. Trying again in 2 sec');
+			// communicateToMMTimer = setTimeout(communicateToMM, 2000);
+		}
+	};
+	xmlHttp.open('GET',
+
+	//url
+	"https://s10.eaglepixelstreaming.com/getFreeCS/"
+	
+	, true); // true for asynchronous
+
+	try {
+		xmlHttp.send(null);
+	} catch (e) {
+		console.log('XXXXXXXXXXXXXXXXXXX communicateToMM try catch error : ');
+		console.log(e);
+	}
+}
+
+function connect(psUlr) {
+    "use strict";
+	window.streamer = psUlr;
     window.WebSocket = window.WebSocket || window.MozWebSocket;
 
     if (!window.WebSocket) {
@@ -2559,7 +2669,11 @@ function connect() {
     }
 
     // Make a new websocket connection
-    let connectionUrl = window.location.href.replace('http://', 'ws://').replace('https://', 'wss://');
+	
+	console.log('psUlr ' + psUlr);
+	
+	
+    let connectionUrl = psUlr//window.location.href.replace('http://', 'ws://').replace('https://', 'wss://');
     console.log(`Creating a websocket connection to: ${connectionUrl}`);
     ws = new WebSocket(connectionUrl);
     ws.attemptStreamReconnection = true;
@@ -2576,6 +2690,14 @@ function connect() {
     }
 
     ws.onmessage = function(event) {
+		
+			if (needToKick) {
+			needToKick = false;
+			ws.send(JSON.stringify({ type: 'kick' }));
+			console.log('Kicking other players from the session ' + psUlr);
+			ws.close();
+		}
+		
 
         // Check if websocket message is binary, if so, stringify it.
         if(event.data && event.data instanceof Blob) {
@@ -2603,7 +2725,27 @@ function connect() {
             console.warn(msg.warning);
         } else if (msg.type === 'peerDataChannels') {
             onWebRtcSFUPeerDatachannels(msg);
-        } else {
+        } 
+		
+		
+		else if (msg.type === 'AppAcquiringData') {
+			//{"datatype":"AppPreparationData","data":{"percent":70,"fileCount":55,"file":""}}
+			appAcquiringData = msg.data.percent;
+			console.log('AppAcquiringData:  ' + msg.data.percent);
+		} else if (msg.type === 'AppPreparationData') {
+			//{"datatype":"AppPreparationData","data":{"percent":70,"fileCount":55,"file":""}}
+			console.log('AppPreparationData:  ' + msg.data.percent);
+			appPreparationData = msg.data.percent;
+			if (msg.data.percent >= 100)
+				console.log(
+					'a updated version of app available. PLz refresh the tab to try new version  ',
+				);
+			updateAvailable = true;
+		} 
+		
+		
+		
+		else {
             console.error("Invalid SS message type", msg.type);
         }
     };
@@ -2616,7 +2758,8 @@ function connect() {
 
         closeStream();
 
-        if(ws.attemptStreamReconnection === true){
+        if(ws.attemptStreamReconnection === true)
+		{
             console.log(`WS closed: ${JSON.stringify(event.code)} - ${event.reason}`);
             if(event.reason !== "")
             {
@@ -2632,8 +2775,44 @@ function connect() {
                 start(true)
             }, 4000);
         }
+		else
+		{
+		
+				console.log(`WS closed: ${JSON.stringify(event.code)} - ${event.reason}`);
+				ws = undefined;
+				if (event.reason === 'kicked') {
+					// window.location.href = window.location.origin + '/login?noPlaces=true&kicked=true';
+					is_reconnection = false;
+				} 
+				else if (event.reason === 'sessionexpired') 
+				{
+					is_reconnection = false;
+					stopWs=true
+				} 
+				else 
+				{
+					is_reconnection = true;
+				}
+				if (needToKick) {
+					//psUlr = psUlr1;
+				}
 
-        ws = undefined;
+				// destroy `webRtcPlayerObj` if any
+				let playerDiv = document.getElementById('player');
+				if (webRtcPlayerObj) {
+					playerDiv.removeChild(webRtcPlayerObj.video);
+					webRtcPlayerObj.close();
+					webRtcPlayerObj = undefined;
+				}
+
+				//showTextOverlay(`Disconnected: ${event.reason}`);
+				if (!stopWs) {
+					let reclickToStart = setTimeout(start, 4000);
+				}
+					
+		}
+
+		
     };
 }
 
@@ -2759,3 +2938,31 @@ function load() {
     addResponseEventListener('logListener', (response) => {console.log(`Received response message from streamer: "${response}"`)})
     start(false);
 }
+var Timeout_ExpireOnCountDown=undefined
+function startExpireOnCountDown() 
+{
+
+  //it will reset existing countdow
+  clearTimeout(Timeout_ExpireOnCountDown);
+  Timeout_ExpireOnCountDown = setTimeout(
+											function () 
+												{
+												 
+												  
+												  
+												
+												 if(ws)
+													//ws.close();
+													ws.close(4000, 'sessionexpired');
+												
+												//afk.overlay.innerHTML = '<center>session expired</center>';
+  
+												//showAfkOverlay()
+												console.log('sessionexpired' );
+												},
+											30*1000
+   
+										);
+}
+
+//startExpireOnCountDown()
