@@ -330,6 +330,7 @@ function sfuIsConnected() {
 }
 
 function logIncoming(sourceName, msgType, msg) {
+	return
 	if (config.LogVerbose)
 		console.logColor(logging.Blue, "\x1b[37m-> %s\x1b[34m: %s", sourceName, msg);
 	else
@@ -337,6 +338,7 @@ function logIncoming(sourceName, msgType, msg) {
 }
 
 function logOutgoing(destName, msgType, msg) {
+	return
 	if (config.LogVerbose)
 		console.logColor(logging.Green, "\x1b[37m<- %s\x1b[32m: %s", destName, msg);
 	else
@@ -450,8 +452,12 @@ streamerServer.on('connection', function (ws, req) {
 	}
 	
 	ws.on('close', function(code, reason) {
-		console.error(`streamer disconnected: ${code} - ${reason}`);
-		onStreamerDisconnected();
+		try {
+			console.error(`streamer disconnected: ${code} - ${reason}`);
+			onStreamerDisconnected();
+		} catch(err) {
+			console.error(`ERROR: ws.on close error: ${err.message}`);
+		}
 	});
 
 	ws.on('error', function(error) {
@@ -1096,7 +1102,7 @@ var AppDataProvidedBySS={
 
 function getAppDetails()
 {
-	
+
     const axiosConfig = {
       headers: {
         'Content-Type': 'application/json', 
@@ -1625,7 +1631,7 @@ function stoptUnrealApp(shouldRestart=false)
 										
 									}
 									else
-										console.logColor(logging.Blue,"stoptUnrealApp() Process killed. . streamer stilol running  " );
+										console.logColor(logging.Red,"!!!!!!!!!!!!!!!  stoptUnrealApp() Process killed. . streamer still running  " );
 					}
 				});
 				child.stderr.on("data", function(data) {
@@ -1719,13 +1725,14 @@ function StartUnrealApp()
 
 //https://stackoverflow.com/questions/31673587/error-unable-to-verify-the-first-certificate-in-nodejs
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0
-function checkStatusInMM()
+function checkStatusInMM111()
 {
 //https://mmkr-snbx.jllmena.me/getAllCS
 //https://mps3.eaglepixelstreaming.com/getAllCS
 //https://aldar-staging.eaglepixelstreaming.com:4430/getAllCS
 //http://aldar-staging.eaglepixelstreaming.com:33891/getAllCS
     var url = "https://"+config.MatchmakerAddress+":"+config.MatchmakerHttpsPort + "/getAllCS"
+    // url = "https://s10.eaglepixelstreaming.com/getFreeCS/"
     //https://files-api.eaglepixelstreaming.com/api/v1/files/ruya/EagleStreamingMechns/
 
 
@@ -1752,55 +1759,125 @@ function checkStatusInMM()
         .then(
             (result) =>
             {
-                // console.log("getAppDetails result.data : "+JSON.stringify(result) );
-                 //console.log("getAppDetails result.data : "+JSON.stringify(result.data) );
+                 //console.log("getAppDetails result.data : "+JSON.stringify(result) );
+                 console.log("getAppDetails result.data : "+JSON.stringify(result.data) );
                 
 				
-for(i=0;i<result.data.length;i++)
-{
-	/* console.log(result.data[i].domain);
-	console.log(config.domain);
-	
-		console.log(result.data[i].port);
-	console.log(config.HttpPort);
-		console.log(result.data[i].HttpsPort);
-	console.log(config.HttpsPort); */
-	
-	if(
-	(result.data[i].domain==config.domain)
-	&&(result.data[i].port==config.HttpPort)
-	&&(result.data[i].HttpsPort==config.HttpsPort)
-	)
-	{
-		console.log("found" );
-		
-		if(result.data[i].numConnectedClients != players.size)
-		{
-			console.logColor(logging.Red, "result.data[i].numConnectedClients : "+result.data[i].numConnectedClients);
-			console.logColor(logging.Red, "players.size : "+players.size);
-		}
-		
-		break
-	}
-	
-	
-	
-}
+					for(i=0;i<result.data.length;i++)
+					{
+						 // console.log(result.data[i].domain);
+						// console.log(config.domain);
+						
+							// console.log(result.data[i].port);
+						// console.log(config.HttpPort);
+							// console.log(result.data[i].HttpsPort);
+						// console.log(config.HttpsPort); 
+						
+						if(
+						(result.data[i].domain==config.domain)
+						&&(result.data[i].port==config.HttpPort)
+						&&(result.data[i].HttpsPort==config.HttpsPort)
+						)
+						{
+							console.log("found" );
+							
+							if(result.data[i].numConnectedClients != players.size)
+							{
+								console.logColor(logging.Red, "result.data[i].numConnectedClients : "+result.data[i].numConnectedClients);
+								console.logColor(logging.Red, "players.size : "+players.size);
+							}
+							
+							break
+						}
+						
+						
+						
+					}
 
 
                
             }
-        )
+			)
 
-        .catch((err) =>
+         .catch((err) =>
         {
-            console.log(
-                " checkStatusInMM() err:" + err
-            );
-        });
+            console.log(" checkStatusInMM() err:" + err);
+            //console.dir(err);
+        }); 
 
    
 }
+
+
+function checkStatusInMM()
+{
+//https://mmkr-snbx.jllmena.me/getAllCS
+//https://mps3.eaglepixelstreaming.com/getAllCS
+//https://aldar-staging.eaglepixelstreaming.com:4430/getAllCS
+//http://aldar-staging.eaglepixelstreaming.com:33891/getAllCS
+    var url = "https://"+config.MatchmakerAddress+":"+config.MatchmakerHttpsPort + "/getAllCS"
+    // url = "https://s10.eaglepixelstreaming.com/getFreeCS/"
+    //https://files-api.eaglepixelstreaming.com/api/v1/files/ruya/EagleStreamingMechns/
+
+
+   // console.log("checkStatusInMM() url :" + url);
+
+
+
+// var https2 = require('https');
+// var rootCas = require('ssl-root-cas').create();
+
+// rootCas.addFile(path.join(__dirname, './certificates/client-key.pem'));
+// var httpsAgent2 = new https2.Agent({ca: rootCas});
+
+// const httpsAgent2 = new require("https").Agent({
+  // rejectUnauthorized: true,
+// });
+  
+  
+   let flag = axios.get(url)
+    .then((result) => {
+       // console.log("getAppDetails result.data: " + JSON.stringify(result.data));
+        
+        for (let i = 0; i < result.data.length; i++) {
+            if (result.data[i].domain === config.domain &&
+                result.data[i].port === config.HttpPort &&
+                result.data[i].HttpsPort === config.HttpsPort) {
+                
+                console.log("Found matching configuration.");
+
+                if (result.data[i].numConnectedClients !== players.size) {
+                    console.logColor(logging.Red, "result.data[i].numConnectedClients: " + result.data[i].numConnectedClients);
+                    console.logColor(logging.Red, "players.size: " + players.size);
+                }
+
+                break;
+            }
+        }
+    })
+    .catch((err) => {
+       // console.log("Error occurred while fetching data:", err);
+       
+        /* // Handle specific error cases if needed
+        if (err.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            console.log("Server responded with status code:", err.response.status);
+            console.log("Response data:", err.response.data);
+        } else if (err.request) {
+            // The request was made but no response was received
+            console.log("No response received from the server.");
+            //console.log("Request details:", err.request);
+        } else {
+            // Something happened in setting up the request that triggered an Error
+            console.log("Error setting up the request:", err.message);
+        } */
+    });
+
+   
+}
+
+
 setInterval(function() 
 		{checkStatusInMM()
 		}, 5 * 1000);
