@@ -5,7 +5,7 @@ var enableRESTAPI = true;
 const defaultConfig = {
 	// The port clients connect to the matchmaking service over HTTP
 	HttpPort: 80,
-	UseHTTPS: false,
+	UseHTTPS: true,
 	// The matchmaking port the signaling service connects to the matchmaker
 	MatchmakerPort: 9999,
 
