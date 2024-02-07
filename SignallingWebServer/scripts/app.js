@@ -2569,7 +2569,8 @@ function communicateToMM() {
 		//console.log("communicateToMM()  xmlHttp.responseText: " + xmlHttp.responseText);
 
 		if (xmlHttp.status == 429) {
-			if (communicateToMMTimer != undefined) clearTimeout(communicateToMMTimer);
+			if (communicateToMMTimer != undefined) 
+				clearTimeout(communicateToMMTimer);
 
 			// console.log("11111111111111111setTimeout(communicateToMMTimer, 2000)");
 			communicateToMMTimer = setTimeout(communicateToMM, 2000);
@@ -2617,7 +2618,8 @@ function communicateToMM() {
 					window.kickUrl = fsgs.kickUrl;
 					connect(sfsg);
 				} else {
-					if (communicateToMMTimer !== undefined) clearTimeout(communicateToMMTimer);
+					if (communicateToMMTimer !== undefined) 
+						clearTimeout(communicateToMMTimer);
 					console.log('No free streamer available. so trying again in 2sec');
 					streamerCounter++;
 					if (streamerCounter < 5) {
@@ -2637,12 +2639,36 @@ function communicateToMM() {
 		} else {
 			//console.error("getInfo Request not successful", xmlHttp.readyState, xmlHttp.status);
 			//console.error("getInfo xmlHttp.responseText: ", xmlHttp.responseText);
-			if (communicateToMMTimer != undefined) clearTimeout(communicateToMMTimer);
+			if (communicateToMMTimer != undefined) 
+				clearTimeout(communicateToMMTimer);
 
 			console.log('MM unvailable. Trying again in 2 sec');
 			// communicateToMMTimer = setTimeout(communicateToMM, 2000);
 		}
 	};
+	
+	xmlHttp.addEventListener("error", function(e) 
+	{
+			console.log('Error occurred while sending the request:');
+			console.log(e);
+			
+			// Check if the error is due to connection refused
+			if (xmlHttp.status === 0) {
+				
+				console.log('Connection refused error occurred.');
+				
+				if (communicateToMMTimer != undefined) 
+						clearTimeout(communicateToMMTimer);
+
+					console.log('MM unvailable. Trying again in 2 sec');
+					
+				
+					// console.log("11111111111111111setTimeout(communicateToMMTimer, 2000)");
+					communicateToMMTimer = setTimeout(communicateToMM, 2000);
+					return;
+			}
+	});
+
 	xmlHttp.open('GET',
 
 	//url
