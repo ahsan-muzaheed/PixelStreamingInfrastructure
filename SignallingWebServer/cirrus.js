@@ -442,9 +442,11 @@ streamerServer.on('connection', function (ws, req) {
 	});
 
 	function onStreamerDisconnected() {
+		console.error("onStreamerDisconnected() ");
 		sendStreamerDisconnectedToMatchmaker();
 		disconnectAllPlayers();
-		if (sfuIsConnected()) {
+		if (sfuIsConnected()) 
+		{
 			const msg = { type: "streamerDisconnected" };
 			sfu.send(JSON.stringify(msg));
 		}
@@ -1592,7 +1594,7 @@ function restartUnrealApp()
 }
 function stoptUnrealApp(shouldRestart=false) 
 {
-	if (!streamer)
+		if(streamer == null)
 		{
 			console.logColor(logging.Red,"stoptUnrealApp() streamer undefined. so no exe to stop.   " );
 			console.logColor(logging.Red,"stoptUnrealApp() shouldRestart:   "+shouldRestart );
@@ -1624,14 +1626,14 @@ function stoptUnrealApp(shouldRestart=false)
 					
 					if(data== "Process killed")
 					{
-									if (streamer)
+									if(streamer == null)
 									{
 										console.logColor(logging.Blue,"stoptUnrealApp() Process killed. yes. streamer killed " );
 										
 										
 									}
 									else
-										console.logColor(logging.Red,"!!!!!!!!!!!!!!!  stoptUnrealApp() Process killed. . streamer still running  " );
+										console.logColor(logging.Red,"!!!!!!!!!!!!!!!  stoptUnrealApp() Process killed. BUT streamer still running. is streamer == null not yet true !!!!!!!!!!! " );
 					}
 				});
 				child.stderr.on("data", function(data) {
@@ -1640,7 +1642,13 @@ function stoptUnrealApp(shouldRestart=false)
 				child.on("exit",function(){
 					console.log("stoptUnrealApp The PowerShell script complete.");
 					if(shouldRestart)
+					{
+						console.log("stoptUnrealApp() shouldRestart:"+shouldRestart+" SO CALLING StartUnrealApp() ");
 						StartUnrealApp()
+						
+					}
+					else
+						console.log("stoptUnrealApp() shouldRestart:"+shouldRestart+" SO skipping StartUnrealApp() ");
 				});
 				child.stdin.end();
 			} catch(e) {
@@ -1653,25 +1661,23 @@ function stoptUnrealApp(shouldRestart=false)
 var isLunchingStramer=false
 function StartUnrealApp() 
 {
-		if (streamer)
+		if(streamer != null)
 		{
 			console.logColor(logging.Red,"StartUnrealApp() but stramer connected. excuting restartUnrealApp()  " );
 			restartUnrealApp()
 			return
 		}
-		console.logColor(logging.Red,"StartUnrealApp() isLunchingStramer:  "+isLunchingStramer );
+		
 		if(isLunchingStramer)
+		{
+			console.logColor(logging.Red,"StartUnrealApp() returning bcz isLunchingStramer:  "+isLunchingStramer );
 			return
+			
+		}
 		
 		console.trace()
-			try 
-			{
-				isLunchingStramer=true
-				var spawn = require("child_process").spawn,child;
-				// TODO: Need to pass in a config path to this for more robustness and not hard coded
-				
 		
-				var pathtoexec	=  
+		var pathtoexec	=  
 						exeDirectory 
 						+config.owner
 						+"\\"+config.app
@@ -1686,10 +1692,21 @@ function StartUnrealApp()
 						}
 						else
 						{
-							console.logColor(logging.Red,"StartUnrealApp() exe dont exist:  "+pathtoexec );
-							isLunchingStramer=false
+							console.logColor(logging.Red,"StartUnrealApp() returning bcz exe dont exist:  "+pathtoexec );
+							
 							return					
 						}
+						
+			try 
+			{
+				isLunchingStramer=true
+				console.logColor(logging.Blue,"StartUnrealApp() setting isLunchingStramer to   " +isLunchingStramer);
+		
+				var spawn = require("child_process").spawn,child;
+				// TODO: Need to pass in a config path to this for more robustness and not hard coded
+				
+		
+				
 						
 					var cmd= 
 						".\\StartApp.ps1 "
@@ -1709,7 +1726,9 @@ function StartUnrealApp()
 					//console.log("PowerShell Errors: " + data);
 				});
 				child.on("exit",function(){
-					//isLunchingStramer=false
+					isLunchingStramer=false
+					console.logColor(logging.Blue,"StartUnrealApp() setting isLunchingStramer to   " +isLunchingStramer);
+		
 					console.log("StartUnrealApp The PowerShell script complete.");
 				});
 				child.stdin.end();
