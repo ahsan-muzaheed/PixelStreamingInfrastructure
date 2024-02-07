@@ -1113,7 +1113,7 @@ function getAppDetails()
     var url = config.APIendpoint + config.owner + "/" + config.app
 
 
-    console.log("getAppDetails() url :" + url);
+   //console.log("getAppDetails() url :" + url);
 
     let flag =
         axios.get(url, axiosConfig)
@@ -1724,7 +1724,7 @@ function StartUnrealApp()
 }
 
 //https://stackoverflow.com/questions/31673587/error-unable-to-verify-the-first-certificate-in-nodejs
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0
+//process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0
 function checkStatusInMM111()
 {
 //https://mmkr-snbx.jllmena.me/getAllCS
